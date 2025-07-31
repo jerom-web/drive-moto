@@ -1,0 +1,50 @@
+{
+  "expo": {
+    "name": "TD-MotorCycles",
+    "slug": "TD-MotorCycles",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#f9c834"
+    },
+    "updates": {
+      "fallbackToCacheTimeout": 0
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "READ_EXTERNAL_STORAGE"
+      ],
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#FFFFFF"
+      },
+      "package": "com.hichemexpots.TDMotorCycles",
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyAPaVRYITE6xPAp04F2C0dXNQ9pkwNjqUM"
+        }
+      }
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "0713abf0-9759-46a2-b9b7-4a88b2265b1b"
+      }
+    },
+    "plugins": [
+      "expo-build-properties"
+    ]
+  }
+}

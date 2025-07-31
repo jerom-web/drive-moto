@@ -1,0 +1,147 @@
+// screens/LoginScreen.js
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  TextInput,
+  Button,
+  Text,
+  StyleSheet,
+  Alert,
+  ActivityIndicator,
+  TouchableOpacity,
+} from 'react-native';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '../../firebase/firebase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Location from 'expo-location';
+
+export default function LoginScreen({ navigation }) {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const loadRemembered = async () => {
+      const savedEmail = await AsyncStorage.getItem('rememberedEmail');
+      if (savedEmail) {
+        setEmail(savedEmail);
+        setRememberMe(true);
+      }
+    };
+    loadRemembered();
+
+    (async () => {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permission Required',
+          'Location permission is needed to show your current position on the map.'
+        );
+      }
+    })();
+  }, []);
+
+  const handleLogin = async () => {
+    if (!email || !password) {
+      Alert.alert('Error', 'Please enter both email and password');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+      if (rememberMe) {
+        await AsyncStorage.setItem('rememberedEmail', email);
+      } else {
+        await AsyncStorage.removeItem('rememberedEmail');
+      }
+      navigation.replace('OrdersScreen');
+    } catch (error) {
+      Alert.alert('Login Failed', error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>Rider Login</Text>
+
+      <TextInput
+        placeholder="Email"
+        style={styles.input}
+        autoCapitalize="none"
+        keyboardType="email-address"
+        value={email}
+        onChangeText={setEmail}
+      />
+
+      <TextInput
+        placeholder="Password"
+        secureTextEntry
+        style={styles.input}
+        value={password}
+        onChangeText={setPassword}
+      />
+
+      <TouchableOpacity
+        onPress={() => setRememberMe(!rememberMe)}
+        style={styles.checkboxRow}
+      >
+        <View style={[styles.checkbox, rememberMe && styles.checkboxChecked]} />
+        <Text style={styles.checkboxLabel}>Remember Me</Text>
+      </TouchableOpacity>
+
+      {loading ? (
+        <ActivityIndicator size="large" color="#000" />
+      ) : (
+        <Button title="Login" onPress={handleLogin} />
+      )}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    padding: 20,
+    backgroundColor: '#fcd53f',
+  },
+  input: {
+    backgroundColor: 'white',
+    padding: 12,
+    marginVertical: 10,
+    borderRadius: 8,
+  },
+  title: {
+    fontSize: 26,
+    textAlign: 'center',
+    marginBottom: 30,
+    fontWeight: 'bold',
+    color: '#222',
+  },
+  checkboxRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+    marginTop: 5,
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderWidth: 2,
+    borderColor: '#222',
+    borderRadius: 5,
+    marginRight: 10,
+  },
+  checkboxChecked: {
+    backgroundColor: '#222',
+  },
+  checkboxLabel: {
+    fontSize: 16,
+    color: '#222',
+    fontWeight: '500',
+  },
+});
