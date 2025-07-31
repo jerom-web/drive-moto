@@ -1,0 +1,137 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions for role checking
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function getUserRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+    
+    function isCustomer() {
+      return isAuthenticated() && getUserRole() == 'customer';
+    }
+    
+    function isDriver() {
+      return isAuthenticated() && getUserRole() == 'driver';
+    }
+    
+    function isRestaurant() {
+      return isAuthenticated() && getUserRole() == 'restaurant';
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // Users collection - stores basic user info and roles
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create: if isAuthenticated() && isOwner(userId) && 
+        request.resource.data.keys().hasAll(['email', 'role', 'createdAt']) &&
+        request.resource.data.role in ['customer', 'driver', 'restaurant'];
+      allow update: if isOwner(userId) && 
+        !('role' in request.resource.data.diff(resource.data).affectedKeys());
+    }
+    
+    // Customer profiles - only customers can access their own data
+    match /customers/{customerId} {
+      allow read, write: if isCustomer() && isOwner(customerId);
+    }
+    
+    // Driver profiles - only drivers can access their own data
+    match /drivers/{driverId} {
+      allow read, write: if isDriver() && isOwner(driverId);
+    }
+    
+    // Restaurant profiles - only restaurant owners can access their own data
+    match /restaurants/{restaurantId} {
+      allow read: if isAuthenticated(); // All users can read restaurant info
+      allow write: if isRestaurant() && 
+        get(/databases/$(database)/documents/restaurants/$(restaurantId)).data.ownerId == request.auth.uid;
+      allow create: if isRestaurant() && 
+        request.resource.data.ownerId == request.auth.uid;
+    }
+    
+    // Orders collection - different access based on role
+    match /orders/{orderId} {
+      allow read: if isAuthenticated() && (
+        // Customers can read their own orders
+        (isCustomer() && resource.data.customerId == request.auth.uid) ||
+        // Drivers can read orders assigned to them or available orders
+        (isDriver() && (resource.data.driverId == request.auth.uid || resource.data.status == 'READY')) ||
+        // Restaurants can read orders for their restaurant
+        (isRestaurant() && resource.data.restaurantOwnerId == request.auth.uid)
+      );
+      
+      allow create: if isCustomer() && 
+        request.resource.data.customerId == request.auth.uid;
+      
+      allow update: if isAuthenticated() && (
+        // Customers can update their own orders (before confirmed)
+        (isCustomer() && resource.data.customerId == request.auth.uid && 
+         resource.data.status in ['PENDING', 'CART']) ||
+        // Drivers can accept orders and update delivery status
+        (isDriver() && (
+          (resource.data.status == 'READY' && request.resource.data.driverId == request.auth.uid) ||
+          (resource.data.driverId == request.auth.uid && 
+           request.resource.data.status in ['PICKED_UP', 'DELIVERED'])
+        )) ||
+        // Restaurants can update order status for their orders
+        (isRestaurant() && resource.data.restaurantOwnerId == request.auth.uid &&
+         request.resource.data.status in ['CONFIRMED', 'PREPARING', 'READY'])
+      );
+    }
+    
+    // Order dishes - linked to orders
+    match /orderDishes/{orderDishId} {
+      allow read, write: if isAuthenticated() && (
+        // Check if user has access to the related order
+        exists(/databases/$(database)/documents/orders/$(resource.data.orderId)) &&
+        (
+          (isCustomer() && get(/databases/$(database)/documents/orders/$(resource.data.orderId)).data.customerId == request.auth.uid) ||
+          (isDriver() && get(/databases/$(database)/documents/orders/$(resource.data.orderId)).data.driverId == request.auth.uid) ||
+          (isRestaurant() && get(/databases/$(database)/documents/orders/$(resource.data.orderId)).data.restaurantOwnerId == request.auth.uid)
+        )
+      );
+    }
+    
+    // Dishes collection - restaurants can manage their dishes, others can read
+    match /dishes/{dishId} {
+      allow read: if isAuthenticated();
+      allow write: if isRestaurant() && 
+        resource.data.restaurantOwnerId == request.auth.uid;
+      allow create: if isRestaurant() && 
+        request.resource.data.restaurantOwnerId == request.auth.uid;
+    }
+    
+    // Reviews collection
+    match /reviews/{reviewId} {
+      allow read: if isAuthenticated();
+      allow create: if isCustomer() && 
+        request.resource.data.customerId == request.auth.uid;
+      allow update: if isCustomer() && 
+        resource.data.customerId == request.auth.uid;
+    }
+    
+    // Driver locations (for real-time tracking)
+    match /driverLocations/{driverId} {
+      allow read: if isAuthenticated() && (
+        // Drivers can read/write their own location
+        (isDriver() && isOwner(driverId)) ||
+        // Customers and restaurants can read driver location for their orders
+        (exists(/databases/$(database)/documents/orders) && 
+         exists(/databases/$(database)/documents/orders/$(resource.data.activeOrderId)))
+      );
+      allow write: if isDriver() && isOwner(driverId);
+    }
+    
+    // Admin functions (if needed)
+    match /admin/{document=**} {
+      allow read, write: if false; // Restrict admin access - handle via Cloud Functions
+    }
+  }
+}

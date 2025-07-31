@@ -10,9 +10,7 @@ import {
   ActivityIndicator,
   TouchableOpacity,
 } from 'react-native';
-import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '../../firebase/firebase';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import authService from '../services/authService';
 import * as Location from 'expo-location';
 
 export default function LoginScreen({ navigation }) {
@@ -23,7 +21,7 @@ export default function LoginScreen({ navigation }) {
 
   useEffect(() => {
     const loadRemembered = async () => {
-      const savedEmail = await AsyncStorage.getItem('rememberedEmail');
+      const savedEmail = await authService.getRememberedEmail();
       if (savedEmail) {
         setEmail(savedEmail);
         setRememberMe(true);
@@ -50,18 +48,18 @@ export default function LoginScreen({ navigation }) {
 
     setLoading(true);
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-      if (rememberMe) {
-        await AsyncStorage.setItem('rememberedEmail', email);
-      } else {
-        await AsyncStorage.removeItem('rememberedEmail');
-      }
+      // Login with driver role validation
+      await authService.login(email, password, 'driver', rememberMe);
       navigation.replace('OrdersScreen');
     } catch (error) {
       Alert.alert('Login Failed', error.message);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSignup = () => {
+    navigation.navigate('SignupScreen');
   };
 
   return (
@@ -96,7 +94,15 @@ export default function LoginScreen({ navigation }) {
       {loading ? (
         <ActivityIndicator size="large" color="#000" />
       ) : (
-        <Button title="Login" onPress={handleLogin} />
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
+            <Text style={styles.loginButtonText}>Login</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity style={styles.signupButton} onPress={handleSignup}>
+            <Text style={styles.signupButtonText}>New Driver? Sign Up</Text>
+          </TouchableOpacity>
+        </View>
       )}
     </View>
   );
@@ -143,5 +149,32 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#222',
     fontWeight: '500',
+  },
+  buttonContainer: {
+    gap: 15,
+  },
+  loginButton: {
+    backgroundColor: '#222',
+    paddingVertical: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  loginButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  signupButton: {
+    backgroundColor: 'transparent',
+    paddingVertical: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#222',
+  },
+  signupButtonText: {
+    color: '#222',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
