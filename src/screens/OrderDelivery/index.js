@@ -215,7 +215,7 @@ const OrderDelivery = ({ route }) => {
           strokeWidth={5}
           waypoints={deliveryStatus === "READY" ? [restaurantLocation] : []}
           strokeColor="green"
-          apikey="AIzaSyAPaVRYITE6xPAp04F2C0dXNQ9pkwNjqUM"
+          apikey="AIz"
           onReady={(result) => {
             try {
               setTotalMinutes(result.duration);
